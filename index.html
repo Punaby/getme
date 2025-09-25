@@ -205,10 +205,80 @@
 </div>
 
 <script>
+
+    const express = require('express');
+const fs = require('fs').promises; // Use async/await for file system
+const path = require('path');
+const app = express();
+const port = 3000;
+
+app.use(express.json());
+
+const dbPath = path.join(__dirname, 'users.json');
+
+// Function to read users from file
+async function readUsersFromFile() {
+    try {
+        const data = await fs.readFile(dbPath, 'utf8');
+        return JSON.parse(data);
+    } catch (error) {
+        // Return an empty array if the file doesn't exist
+        return [];
+    }
+}
+
+// Function to write users to file
+async function writeUsersToFile(users) {
+    await fs.writeFile(dbPath, JSON.stringify(users, null, 2), 'utf8');
+}
+
+// API endpoint to get all users
+app.get('/api/users', async (req, res) => {
+    const users = await readUsersFromFile();
+    res.json(users);
+});
+
+// API endpoint to add a new user
+    function add(){
+app.post('/api/users', async (req, res) => {
+    const newUserName = req.body.name;
+    if (newUserName) {
+        const users = await readUsersFromFile();
+        const newUser = { id: Date.now(), name: newUserName };
+        users.push(newUser);
+        await writeUsersToFile(users);
+        res.status(201).json(newUser);
+    } else {
+        res.status(400).send({ error: 'User name is required.' });
+    }
+});
+    }
+
+// API endpoint to delete a user
+    function remove () {
+app.delete('/api/users/:id', async (req, res) => {
+    const userId = parseInt(req.params.id);
+    let users = await readUsersFromFile();
+    const initialUserCount = users.length;
+    users = users.filter(user => user.id !== userId);
+
+    if (users.length < initialUserCount) {
+        await writeUsersToFile(users);
+        res.status(200).send({ message: 'User deleted successfully.' });
+    } else {
+        res.status(404).send({ error: 'User not found.' });
+    }
+});
+    }
+app.listen(port, () => {
+    console.log(`Server listening at http://localhost:${port}`);
+});
+    //--- Check and restrict users---
+
     // --- Data Management Functions ---
     const STORAGE_KEY = 'appUsers';
 
-    const defaultUsers = [
+    var defaultUsers = [
         { username: "user123", password: "lemonade", isSuspended: false, deviceId: null, isAdmin: false },
         { username: "THEAdmin", password: "pass", isSuspended: false, deviceId: null, isAdmin: true },
         { username: "player1", password: "gamer123", isSuspended: false, deviceId: null, isAdmin: false }
@@ -234,10 +304,6 @@
 
     function saveUsersToLocalStorage() {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
-    }
-
-    function generateDeviceId() {
-        return 'device-' + Math.random().toString(36).substr(2, 9);
     }
 
     // --- UI State Management Functions ---
@@ -331,33 +397,6 @@ if (type=="vex"){
                 return;
             }
 
-            let currentDeviceId = localStorage.getItem('deviceId');
-            if (!currentDeviceId) {
-                currentDeviceId = generateDeviceId();
-                localStorage.setItem('deviceId', currentDeviceId);
-            }
-
-            if (user.isAdmin) {
-                // Admin accounts are NOT restricted to a single device
-                // Update the deviceId for consistency, but don't block login
-                user.deviceId = currentDeviceId;
-                saveUsersToLocalStorage();
-                console.log(`Admin user ${user.username} logged in from a new device. Device ID: ${user.deviceId}`);
-            } else {
-                // Regular users are locked to their first device
-                if (user.deviceId) {
-                    if (user.deviceId !== currentDeviceId) {
-                        loginMessage.innerText = "This account can only be used on its registered device.";
-                        return;
-                    }
-                } else {
-                    // First-time login for this regular user, register their device
-                    user.deviceId = currentDeviceId;
-                    saveUsersToLocalStorage();
-                    console.log(`Regular user ${user.username} logged in for the first time. Device ID: ${user.deviceId}`);
-                }
-            }
-
             currentUser = user;
             showMainContent();
             loginMessage.innerText = "";
@@ -377,6 +416,7 @@ if (type=="vex"){
                 return;
             }
             users.push({ username: newUsername, password: newPassword, isSuspended: false, deviceId: null, isAdmin: false });
+            add()
             saveUsersToLocalStorage();
             renderManagementLists();
             document.getElementById('new-username').value = '';
